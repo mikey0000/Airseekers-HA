@@ -1,0 +1,240 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Airseekers account",
+        "description": "Your Airseekers app login. The cloud is used for commands and live video; telemetry is read locally.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "device": {
+        "title": "Choose mower",
+        "data": {
+          "serial": "Mower"
+        }
+      },
+      "local": {
+        "title": "Local connection",
+        "description": "IP address of the mower's Foxglove bridge on your network (prefilled from the cloud when known).",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-enter Airseekers credentials",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password.",
+      "cannot_connect": "Cannot reach the Airseekers cloud.",
+      "cannot_connect_local": "Unable to connect. Ensure the mower is on and the Foxglove bridge is reachable.",
+      "no_devices": "No mowers found in this Airseekers account.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This mower is already configured.",
+      "reauth_successful": "Credentials updated."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery_level": {
+        "name": "Battery"
+      },
+      "battery_voltage": {
+        "name": "Battery voltage"
+      },
+      "battery_current": {
+        "name": "Battery current"
+      },
+      "battery_temperature": {
+        "name": "Battery temperature"
+      },
+      "satellites": {
+        "name": "Satellites"
+      },
+      "lora_rssi": {
+        "name": "LoRa RSSI"
+      },
+      "alarm_status": {
+        "name": "Alarm status",
+        "state": {
+          "ok": "OK",
+          "alarm": "Alarm"
+        }
+      },
+      "rtk_fix_type": {
+        "name": "RTK fix type",
+        "state": {
+          "no_fix": "No fix",
+          "single": "Single",
+          "float": "Float",
+          "fixed": "Fixed"
+        }
+      },
+      "mower_state": {
+        "name": "Mower state",
+        "state": {
+          "idle": "Idle",
+          "mowing": "Mowing",
+          "paused": "Paused",
+          "returning": "Returning",
+          "error": "Error",
+          "docked": "Docked"
+        }
+      },
+      "power_supply_status": {
+        "name": "Power supply status",
+        "state": {
+          "unknown": "Unknown",
+          "charging": "Charging",
+          "discharging": "Discharging",
+          "not_charging": "Not charging",
+          "full": "Full"
+        }
+      },
+      "wifi_rssi": {
+        "name": "WiFi RSSI"
+      },
+      "gps_quality": {
+        "name": "GPS quality"
+      },
+      "gps_snr": {
+        "name": "GPS SNR"
+      },
+      "task_state": {
+        "name": "Task state"
+      },
+      "task_type": {
+        "name": "Task type"
+      },
+      "task_runtime": {
+        "name": "Task runtime"
+      },
+      "task_area_mowed": {
+        "name": "Area mowed"
+      },
+      "task_area_selected": {
+        "name": "Selected zone area"
+      },
+      "task_zone_remaining": {
+        "name": "Area remaining"
+      },
+      "task_progress": {
+        "name": "Mowing progress"
+      },
+      "task_area_total": {
+        "name": "Property area (firmware)"
+      },
+      "task_area_remaining": {
+        "name": "Area remaining (firmware)"
+      }
+    },
+    "binary_sensor": {
+      "charging": {
+        "name": "Charging"
+      },
+      "cutting": {
+        "name": "Cutting"
+      },
+      "moving": {
+        "name": "Moving"
+      },
+      "rain": {
+        "name": "Rain detected"
+      },
+      "lifted": {
+        "name": "Lifted"
+      },
+      "bumper": {
+        "name": "Bumper"
+      },
+      "e_stop": {
+        "name": "Emergency stop"
+      },
+      "routing_active": {
+        "name": "Routing active"
+      },
+      "alarm": {
+        "name": "Alarm"
+      },
+      "nrtk": {
+        "name": "NRTK"
+      },
+      "battery_gate_open": {
+        "name": "Battery gate open"
+      }
+    },
+    "device_tracker": {
+      "position": {
+        "name": "Position"
+      }
+    },
+    "lawn_mower": {
+      "mower": {
+        "name": "Mower"
+      }
+    },
+    "button": {
+      "stop": {
+        "name": "Stop"
+      },
+      "resume": {
+        "name": "Resume"
+      },
+      "rtk_reboot": {
+        "name": "Reboot RTK"
+      },
+      "clean_warn": {
+        "name": "Clear warnings"
+      }
+    },
+    "number": {
+      "volume": {
+        "name": "Volume"
+      },
+      "light_brightness": {
+        "name": "Light brightness"
+      },
+      "cut_height": {
+        "name": "Cut height"
+      }
+    },
+    "switch": {
+      "night_mode": {
+        "name": "Night mode"
+      }
+    },
+    "camera": {
+      "front_camera": {
+        "name": "Front camera"
+      },
+      "left_camera": {
+        "name": "Left camera"
+      },
+      "right_camera": {
+        "name": "Right camera"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Airseekers Tron options",
+        "data": {
+          "cloud_scan_interval": "Cloud refresh interval (seconds)"
+        },
+        "data_description": {
+          "cloud_scan_interval": "Only used for command context and settings; telemetry is pushed locally."
+        }
+      }
+    }
+  }
+}

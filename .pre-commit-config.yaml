@@ -1,0 +1,17 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^(custom_components/airseekers_tron/(__init__|button|camera|cloud_coordinator|config_flow|entity|number|services|switch)\.py|tests/test_cloud_coordinator\.py|tests/test_camera\.py)$
+      - id: ruff-format
+        files: ^(custom_components/airseekers_tron/(__init__|button|camera|cloud_coordinator|config_flow|entity|number|services|switch)\.py|tests/test_cloud_coordinator\.py|tests/test_camera\.py)$
+  - repo: local
+    hooks:
+      - id: tests
+        name: tests
+        entry: env PYTHONPATH=. pytest -q -p no:homeassistant tests
+        language: system
+        pass_filenames: false
+        types: [python]

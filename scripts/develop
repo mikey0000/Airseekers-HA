@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Run a throwaway Home Assistant against the integration in this checkout.
+#
+# The venv already holds a real `hass` (pytest-homeassistant-custom-component
+# pins an exact Home Assistant), so this needs no container.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+CONFIG="${HASS_CONFIG:-config}"
+
+mkdir -p "$CONFIG/custom_components"
+
+# A symlink, not a copy, so an edit only needs a restart.  Clear the path first:
+# ln -sfn would nest the link inside a real directory left by an earlier run.
+rm -rf "$CONFIG/custom_components/airseekers_tron"
+ln -s "$PWD/custom_components/airseekers_tron" "$CONFIG/custom_components/airseekers_tron"
+
+if [ ! -f "$CONFIG/configuration.yaml" ]; then
+  cat > "$CONFIG/configuration.yaml" <<'YAML'
+default_config:
+
+logger:
+  default: info
+  logs:
+    custom_components.airseekers_tron: debug
+    pyairseekers: debug
+YAML
+fi
+
+# Any uv sync replaces these with the pinned wheels; relink the sibling checkouts
+# when they exist (LOCAL_LIBS=0 to run against the pinned versions instead).
+# The pinned dist-info stays, so Home Assistant sees its requirement as met.
+if [ "${LOCAL_LIBS:-1}" != "0" ]; then
+  SITE="$(uv run --no-sync python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+  for lib in pyairseekers:../PyAirseekers; do
+    name="${lib%%:*}"; src="$(cd "${lib#*:}" 2>/dev/null && pwd)/$name"
+    if [ -d "$src" ] && [ "$(readlink "$SITE/$name")" != "$src" ]; then
+      rm -rf "$SITE/$name" && ln -s "$src" "$SITE/$name" && echo "linked $name -> $src"
+    fi
+  done
+fi
+
+exec uv run --no-sync hass --config "$CONFIG" --debug "$@"
