@@ -197,7 +197,7 @@ wheels = [
 
 [[package]]
 name = "airseekers-tron-ha"
-version = "0.3.0"
+version = "0.3.1"
 source = { virtual = "." }
 dependencies = [
     { name = "homeassistant" },
@@ -216,7 +216,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "homeassistant", specifier = ">=2026.9.0" },
-    { name = "pyairseekers", specifier = "==0.1.0" },
+    { name = "pyairseekers", specifier = "==0.2.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -1823,14 +1823,14 @@ wheels = [
 
 [[package]]
 name = "pyairseekers"
-version = "0.1.0"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/69/3306bda143b8e0d785ab6208125306b59d855ad1046bc7b72814948be812/pyairseekers-0.1.0.tar.gz", hash = "sha256:cc931aca3ce6acba03c92b8f4552c7e8590214a5edd59c93332e50073f44c130", size = 126749, upload-time = "2026-10-01T23:31:37.21Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/14/cafe89e737df8ad40c6efae7de86448fb9c6046900a4c32a125870b53b83/pyairseekers-0.2.0.tar.gz", hash = "sha256:4db007157789fe74e57d44e16fcee591180210545ddd8bab68fca1f2157e65b7", size = 141567, upload-time = "2026-10-02T08:06:32.018Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/08/bf/a425384a89e64945850727da8e7305dbe5f82532d96f68d60d7fbb0a67cd/pyairseekers-0.1.0-py3-none-any.whl", hash = "sha256:5906062f004b68777de8c9c67946d50d2ef4ca63725aee16d28e4303e504be6f", size = 24278, upload-time = "2026-10-01T23:31:35.622Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/0e/7f3611662b36b8c7c2fa00109237553c30b7d5b57f1010ea3ec5fb4f9183/pyairseekers-0.2.0-py3-none-any.whl", hash = "sha256:472acaf66af921bda80a9d6fb36f5679736808c0b5596a13ba30c302123542fc", size = 29369, upload-time = "2026-10-02T08:06:30.847Z" },
 ]
 
 [[package]]
