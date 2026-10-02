@@ -6,7 +6,7 @@ import asyncio
 
 from pyairseekers import AirseekersApiError
 
-from custom_components.airseekers_tron.camera import keep_alive
+from custom_components.airseekers_tron.camera import describe_sdp, keep_alive
 
 
 class FakeClock:
@@ -55,3 +55,22 @@ class TestKeepAlive:
         _run(clock, beat)
 
         assert len(attempts) == 3
+
+
+class TestDescribeSdp:
+    def test_summarises_video_codecs_and_candidates(self) -> None:
+        sdp = (
+            "v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\na=rtpmap:111 opus/48000/2\r\n"
+            "m=video 9 UDP/TLS/RTP/SAVPF 103 104\r\na=rtpmap:103 H264/90000\r\na=rtpmap:104 rtx/90000\r\n"
+            "a=candidate:0 1 udp 2130706431 18.158.179.211 8000 typ host generation 0\r\n"
+        )
+
+        assert (
+            describe_sdp(sdp)
+            == "video=['H264'] candidates=['udp/18.158.179.211:8000/host']"
+        )
+
+    def test_marks_a_trickle_offer(self) -> None:
+        assert "none (trickle)" in describe_sdp(
+            "v=0\r\nm=video 9 X 96\r\na=rtpmap:96 VP8/90000\r\n"
+        )

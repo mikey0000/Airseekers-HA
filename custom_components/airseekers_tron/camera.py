@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -44,6 +46,25 @@ CAMERAS = {
     CAMERA_LEFT: "left_camera",
     CAMERA_RIGHT: "right_camera",
 }
+
+
+_RTPMAP = re.compile(r"^a=rtpmap:\d+ ([^/\r\n]+)", re.MULTILINE)
+_CANDIDATE = re.compile(
+    r"^a=candidate:\S+ \d+ (\w+) \d+ (\S+) (\d+) typ (\w+)", re.MULTILINE
+)
+
+
+def describe_sdp(sdp: str) -> str:
+    """One-line summary of an SDP for the debug log: video codecs and candidates."""
+    video = sdp.split("m=video", 1)[1] if "m=video" in sdp else ""
+    codecs = sorted(
+        set(_RTPMAP.findall(video)) - {"rtx", "red", "ulpfec", "flexfec-03"}
+    )
+    candidates = [
+        f"{proto}/{addr}:{port}/{kind}"
+        for proto, addr, port, kind in _CANDIDATE.findall(sdp)
+    ]
+    return f"video={codecs} candidates={candidates or 'none (trickle)'}"
 
 
 @dataclass
@@ -96,6 +117,13 @@ class AirseekersCamera(AirseekersCloudEntity, Camera):
         self, offer_sdp: str, session_id: str, send_message: WebRTCSendMessage
     ) -> None:
         cloud = self.coordinator
+        started = time.monotonic()
+        _LOGGER.debug(
+            "Camera %s session %s offer: %s",
+            self._camera_id,
+            session_id,
+            describe_sdp(offer_sdp),
+        )
         try:
             url = await cloud.api.open_live_stream(cloud.sn, self._camera_id)
             stream = await whep_play(async_get_clientsession(self.hass), url, offer_sdp)
@@ -103,6 +131,13 @@ class AirseekersCamera(AirseekersCloudEntity, Camera):
             _LOGGER.warning("Camera %s: %s", self._camera_id, err)
             send_message(WebRTCError("webrtc_offer_failed", str(err)))
             return
+        _LOGGER.debug(
+            "Camera %s session %s answer after %.1f s: %s",
+            self._camera_id,
+            session_id,
+            time.monotonic() - started,
+            describe_sdp(stream.answer_sdp),
+        )
         heartbeat = self.hass.async_create_background_task(
             keep_alive(lambda: cloud.api.live_heartbeat(cloud.sn, self._camera_id)),
             f"{self.entity_id} live heartbeat",
@@ -114,9 +149,18 @@ class AirseekersCamera(AirseekersCloudEntity, Camera):
         self, session_id: str, candidate: RTCIceCandidateInit
     ) -> None:
         """SRS is ICE-lite; its candidates are already in the answer."""
+        _LOGGER.debug(
+            "Camera %s session %s browser candidate ignored: %s",
+            self._camera_id,
+            session_id,
+            candidate.candidate,
+        )
 
     @callback
     def close_webrtc_session(self, session_id: str) -> None:
+        _LOGGER.debug(
+            "Camera %s session %s closed by Home Assistant", self._camera_id, session_id
+        )
         if (session := self._sessions.pop(session_id, None)) is not None:
             session.heartbeat.cancel()
             self.hass.async_create_task(
