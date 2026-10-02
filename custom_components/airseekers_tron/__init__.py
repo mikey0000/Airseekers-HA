@@ -52,20 +52,28 @@ async def async_setup_entry(
         sn,
         entry.options.get(CONF_CLOUD_SCAN_INTERVAL, DEFAULT_CLOUD_SCAN_INTERVAL),
     )
-    try:
-        await api.login()
-    except AirseekersAuthError as err:
-        raise ConfigEntryAuthFailed(str(err)) from err
-    except AirseekersError as err:
-        raise ConfigEntryNotReady(f"Cannot reach Airseekers cloud: {err}") from err
-    await cloud.async_config_entry_first_refresh()
-
+    # Local first: a retry while the mower is unreachable then costs no cloud login
     local = AirseekersTronCoordinator(hass, entry)
     try:
         await local.async_setup()
     except Exception as err:
         await local.async_shutdown()
-        raise ConfigEntryNotReady(f"Cannot connect to Foxglove bridge: {err}") from err
+        raise ConfigEntryNotReady(
+            f"Cannot connect to Foxglove bridge: {err!r}"
+        ) from err
+
+    try:
+        await api.login()
+        await cloud.async_config_entry_first_refresh()
+    except AirseekersAuthError as err:
+        await local.async_shutdown()
+        raise ConfigEntryAuthFailed(str(err)) from err
+    except AirseekersError as err:
+        await local.async_shutdown()
+        raise ConfigEntryNotReady(f"Cannot reach Airseekers cloud: {err}") from err
+    except ConfigEntryAuthFailed, ConfigEntryNotReady:
+        await local.async_shutdown()
+        raise
 
     entry.runtime_data = AirseekersTronData(local=local, cloud=cloud, sn=sn)
     entry.async_on_unload(local.async_shutdown)

@@ -11,7 +11,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from pyairseekers import FoxgloveClient
@@ -24,6 +24,23 @@ from .models import MowerData
 _LOGGER = logging.getLogger(__name__)
 
 RECONNECT_INTERVAL = 30
+# The bridge publishes hundreds of messages a second; entities are refreshed at
+# most this often, except when an _URGENT_FIELDS value changes (D13)
+PUSH_INTERVAL_S = 5.0
+LORA_NO_LINK_DBM = -128
+_URGENT_FIELDS = (
+    "mower_work_status",
+    "e_stop",
+    "lift_triggered",
+    "bumper_triggered",
+    "rain_triggered",
+    "is_charging",
+    "is_cutting",
+    "task_state",
+    "alarm_status",
+)
+# Topics whose payload identifies the owner's network or SIM; never logged
+_PRIVATE_TOPICS = frozenset({"/mower_base/net_status"})
 
 
 @dataclass
@@ -55,6 +72,8 @@ class AirseekersTronCoordinator(DataUpdateCoordinator[MowerData]):
         self.data = MowerData()
         self._reconnect_task: asyncio.Task[None] | None = None
         self._logged_topics: set[str] = set()
+        self._push_handle: asyncio.TimerHandle | None = None
+        self._last_urgent: tuple[Any, ...] | None = None
 
     async def async_setup(self) -> None:
         """Connect to the bridge and start streaming."""
@@ -66,6 +85,10 @@ class AirseekersTronCoordinator(DataUpdateCoordinator[MowerData]):
         )
 
     async def _on_connection_change(self, connected: bool) -> None:
+        if not connected and self.hass.is_stopping:
+            # Home Assistant closed the session on shutdown; nothing to reconnect to
+            _LOGGER.debug("Foxglove bridge closed during shutdown")
+            return
         if not connected:
             _LOGGER.warning("Foxglove bridge disconnected, scheduling reconnect")
             self.async_set_updated_data(self.data)
@@ -77,8 +100,10 @@ class AirseekersTronCoordinator(DataUpdateCoordinator[MowerData]):
         self._reconnect_task = self.hass.async_create_task(self._reconnect_loop())
 
     async def _reconnect_loop(self) -> None:
-        while not self.client.connected:
+        while not self.client.connected and not self.hass.is_stopping:
             await asyncio.sleep(RECONNECT_INTERVAL)
+            if self.hass.is_stopping:
+                return
             try:
                 _LOGGER.debug("Attempting reconnect to Foxglove bridge")
                 await self.client.disconnect()
@@ -96,6 +121,9 @@ class AirseekersTronCoordinator(DataUpdateCoordinator[MowerData]):
 
     async def async_shutdown(self) -> None:
         """Disconnect from the bridge."""
+        if self._push_handle is not None:
+            self._push_handle.cancel()
+            self._push_handle = None
         if self._reconnect_task and not self._reconnect_task.done():
             self._reconnect_task.cancel()
             try:
@@ -119,19 +147,36 @@ class AirseekersTronCoordinator(DataUpdateCoordinator[MowerData]):
                 "First message on %s (%s): %s",
                 topic,
                 schema_name,
-                _msg_to_dict(msg),
+                "<redacted>" if topic in _PRIVATE_TOPICS else _msg_to_dict(msg),
             )
         handler = _TOPIC_HANDLERS.get(topic)
         if handler:
             handler(self.data, msg)
-            self.async_set_updated_data(self.data)
+            self._push()
+
+    @callback
+    def _push(self) -> None:
+        """Refresh entities now if an urgent field changed, else within PUSH_INTERVAL_S."""
+        urgent = tuple(getattr(self.data, name) for name in _URGENT_FIELDS)
+        if urgent != self._last_urgent:
+            self._last_urgent = urgent
+            self._flush()
+        elif self._push_handle is None:
+            self._push_handle = self.hass.loop.call_later(PUSH_INTERVAL_S, self._flush)
+
+    @callback
+    def _flush(self) -> None:
+        if self._push_handle is not None:
+            self._push_handle.cancel()
+            self._push_handle = None
+        self.async_set_updated_data(self.data)
 
     @staticmethod
     def _safe_float(value: Any) -> float | None:
         try:
             f = float(value)
             return None if math.isnan(f) or math.isinf(f) else f
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
 
@@ -279,7 +324,9 @@ def _handle_localization_info(data: MowerData, msg: Any) -> None:
     lora = getattr(msg, "lora_rssi_dbm", None)
     if lora is None:
         lora = getattr(msg, "lora_rssi", None)
-    data.lora_rssi = AirseekersTronCoordinator._safe_float(lora)
+    rssi = AirseekersTronCoordinator._safe_float(lora)
+    # -128 dBm is the radio's "no LoRa link" value (e.g. on NRTK), not a reading
+    data.lora_rssi = None if rssi is not None and rssi <= LORA_NO_LINK_DBM else rssi
 
 
 def _handle_battery_health(data: MowerData, msg: Any) -> None:
@@ -324,7 +371,7 @@ def _handle_task_info(data: MowerData, msg: Any) -> None:
         return
     try:
         parsed = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return
     data.task_state = parsed.get("state")
     data.task_type = parsed.get("type")
@@ -408,14 +455,14 @@ def _handle_net_status(data: MowerData, msg: Any) -> None:
         return
     try:
         parsed = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return
     for key in ("wifi_dbm", "wifi_rssi", "rssi", "wifi_signal"):
         val = parsed.get(key)
         if val is not None:
             try:
                 data.wifi_rssi = int(val)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 pass
             break
 
@@ -433,11 +480,11 @@ def _parse_runtime(rt: Any) -> int | None:
         parts = rt.split(":")
         try:
             return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-        except (ValueError, IndexError):
+        except ValueError, IndexError:
             return None
     try:
         return int(rt)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 

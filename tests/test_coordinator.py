@@ -555,3 +555,15 @@ class TestParseRuntime:
 
     def test_partial_time(self) -> None:
         assert _parse_runtime("05:30") is None
+
+
+class TestLoraNoLink:
+    def test_no_link_sentinel_reads_as_unknown(self) -> None:
+        data = MowerData()
+        _handle_localization_info(data, SimpleNamespace(rtk_status="SINGLE", lora_rssi_dbm=-128))
+        assert data.lora_rssi is None
+
+    def test_real_reading_is_kept(self) -> None:
+        data = MowerData()
+        _handle_localization_info(data, SimpleNamespace(rtk_status="NARROW_INT", lora_rssi_dbm=-87))
+        assert data.lora_rssi == -87.0

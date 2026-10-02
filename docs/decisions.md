@@ -89,3 +89,25 @@ dropped request does not cut a stream the user is watching.
 Refines D11. The app was captured sending heartbeats 38 s apart; the
 integration uses pyairseekers' `LIVE_HEARTBEAT_INTERVAL_S` (20 s), which
 stays inside that gap even if the capture missed a beat in between.
+
+## D13. Telemetry is debounced before it reaches entities
+
+The bridge publishes hundreds of messages a second (about 490/s observed in
+the first seconds after connecting); refreshing ~50 entities on each one made
+Home Assistant rewrite every state continuously. Messages still update
+`MowerData` as they arrive, but entities are refreshed at most every
+`PUSH_INTERVAL_S` (5 s), except at once when an `_URGENT_FIELDS` value
+changes (mower state, e-stop, lift, bumper, rain, charging, cutting, task
+state, alarm), so safety-relevant changes are never delayed. The network
+status topic (SSID, ICCID, IPs) is never written to the debug log, and the
+LoRa RSSI value -128 dBm (no link, e.g. on NRTK) reads as unknown.
+
+## D14. A parked mower's position has a 1 m deadband
+
+Measured on a docked Tron with a single (non-RTK) fix: successive positions
+wandered 0.1-0.8 m, so after D13 the device tracker still recorded a new state
+row every 5 s. While the mower is neither moving nor cutting, the tracker
+keeps its last published position until the fix moves more than
+`PARKED_DEADBAND_M` (1 m); while moving or cutting it publishes every
+refresh. Shutdown is quiet as well: a connection closed while Home Assistant
+stops is not treated as a drop, so no reconnect is scheduled.
