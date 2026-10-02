@@ -64,6 +64,9 @@ class MowerData:
     task_info_raw: str | None = None
     task_report_raw: str | None = None
     task_state: str | None = None
+    has_legacy_task: bool | None = None
+    legacy_task_id: str | None = None
+    map_id: str | None = None
     task_type: str | None = None
     task_runtime_seconds: int | None = None
     task_area_total: float | None = None
@@ -94,3 +97,4 @@ class MowerData:
 
     # Config (from /robot_config — std_msgs/String)
     robot_config_raw: str | None = None
+    robot_config: dict[str, str] = field(default_factory=dict)

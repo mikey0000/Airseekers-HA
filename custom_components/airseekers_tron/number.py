@@ -18,6 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .cloud_coordinator import AirseekersCloudCoordinator, CloudData
 from .coordinator import AirseekersTronConfigEntry, AirseekersTronData
 from .entity import AirseekersCloudEntity
+from .models import MowerData
 
 
 async def _set_cut_height(cloud: AirseekersCloudCoordinator, value: int) -> None:
@@ -29,11 +30,20 @@ async def _set_cut_height(cloud: AirseekersCloudCoordinator, value: int) -> None
     await cloud.api.update_task_cut_height(cloud.data.tasks[0], value)
 
 
+def local_config_int(local: MowerData, key: str, fallback: int | None) -> int | None:
+    """Read a setting from the mower's /robot_config, else the cloud value."""
+    try:
+        return int(local.robot_config[key])
+    except KeyError, ValueError:
+        return fallback
+
+
 @dataclass(frozen=True, kw_only=True)
 class AirseekersNumberDescription(NumberEntityDescription):
     """Describe an Airseekers cloud number."""
 
-    value_fn: Callable[[CloudData], int | None]
+    value_fn: Callable[[MowerData, CloudData], int | None]
+    reads_local: bool = False
     set_fn: Callable[[AirseekersCloudCoordinator, int], Awaitable[None]]
 
 
@@ -47,7 +57,10 @@ NUMBERS: tuple[AirseekersNumberDescription, ...] = (
         native_step=1,
         native_unit_of_measurement=PERCENTAGE,
         entity_category=EntityCategory.CONFIG,
-        value_fn=lambda d: d.volume,
+        value_fn=lambda local, cloud: local_config_int(
+            local, "SetVolume", cloud.volume
+        ),
+        reads_local=True,
         set_fn=lambda c, v: c.api.set_volume(c.sn, v),
     ),
     AirseekersNumberDescription(
@@ -59,7 +72,10 @@ NUMBERS: tuple[AirseekersNumberDescription, ...] = (
         native_step=1,
         native_unit_of_measurement=PERCENTAGE,
         entity_category=EntityCategory.CONFIG,
-        value_fn=lambda d: d.light_brightness,
+        value_fn=lambda local, cloud: local_config_int(
+            local, "SetLightBrightness", cloud.light_brightness
+        ),
+        reads_local=True,
         set_fn=lambda c, v: c.api.set_light_brightness(c.sn, v),
     ),
     AirseekersNumberDescription(
@@ -71,7 +87,7 @@ NUMBERS: tuple[AirseekersNumberDescription, ...] = (
         native_max_value=90,
         native_step=10,
         native_unit_of_measurement=UnitOfLength.MILLIMETERS,
-        value_fn=lambda d: d.cut_height,
+        value_fn=lambda local, cloud: cloud.cut_height,
         set_fn=_set_cut_height,
     ),
 )
@@ -96,10 +112,11 @@ class AirseekersNumber(AirseekersCloudEntity, NumberEntity):
     ) -> None:
         super().__init__(data, description.key)
         self.entity_description = description
+        self._reads_local = description.reads_local
 
     @property
     def native_value(self) -> int | None:
-        return self.entity_description.value_fn(self.coordinator.data)
+        return self.entity_description.value_fn(self._local.data, self.coordinator.data)
 
     async def async_set_native_value(self, value: float) -> None:
         await self.coordinator.async_command(

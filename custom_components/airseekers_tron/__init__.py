@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
-from pyairseekers import AirseekersAuthError, AirseekersCloud, AirseekersError
+from pyairseekers import AirseekersAuthError, AirseekersCloud, AirseekersError, LocalApi
 
 from .cloud_coordinator import AirseekersCloudCoordinator
 from .const import (
@@ -75,7 +76,8 @@ async def async_setup_entry(
         await local.async_shutdown()
         raise
 
-    entry.runtime_data = AirseekersTronData(local=local, cloud=cloud, sn=sn)
+    http = LocalApi(entry.data[CONF_HOST], async_get_clientsession(hass))
+    entry.runtime_data = AirseekersTronData(local=local, cloud=cloud, http=http, sn=sn)
     entry.async_on_unload(local.async_shutdown)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

@@ -14,7 +14,7 @@ from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from pyairseekers import FoxgloveClient
+from pyairseekers import FoxgloveClient, LocalApi
 
 from .cloud_coordinator import AirseekersCloudCoordinator
 from .const import DOMAIN, SUBSCRIBE_TOPICS
@@ -49,6 +49,7 @@ class AirseekersTronData:
 
     local: AirseekersTronCoordinator
     cloud: AirseekersCloudCoordinator
+    http: LocalApi
     sn: str
 
 
@@ -364,6 +365,18 @@ def _handle_string_topic(field_name: str):
     return handler
 
 
+def _handle_robot_config(data: MowerData, msg: Any) -> None:
+    """The mower's copy of the cloud config keys (SetVolume, SetDarkMode, ...)."""
+    raw = getattr(msg, "data", None)
+    data.robot_config_raw = raw
+    try:
+        parsed = json.loads(raw) if raw else None
+    except json.JSONDecodeError, TypeError:
+        return
+    if isinstance(parsed, dict):
+        data.robot_config = {str(k): str(v) for k, v in parsed.items()}
+
+
 def _handle_task_info(data: MowerData, msg: Any) -> None:
     raw = getattr(msg, "data", None)
     data.task_info_raw = raw
@@ -374,6 +387,11 @@ def _handle_task_info(data: MowerData, msg: Any) -> None:
     except json.JSONDecodeError, TypeError:
         return
     data.task_state = parsed.get("state")
+    if "hasLegacyTask" in parsed:
+        data.has_legacy_task = bool(parsed["hasLegacyTask"])
+        data.legacy_task_id = parsed.get("legacyTaskId") or ""
+    if parsed.get("mapId"):
+        data.map_id = str(parsed["mapId"])
     data.task_type = parsed.get("type")
     rt = parsed.get("runTime")
     if rt is None:
@@ -539,5 +557,5 @@ _TOPIC_HANDLERS: dict[str, Any] = {
     "/geojson_task": _handle_geojson_task,
     "/task_info": _handle_task_info,
     "/task_report": _handle_string_topic("task_report_raw"),
-    "/robot_config": _handle_string_topic("robot_config_raw"),
+    "/robot_config": _handle_robot_config,
 }

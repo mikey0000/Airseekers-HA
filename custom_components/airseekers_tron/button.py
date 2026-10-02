@@ -10,7 +10,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .cloud_coordinator import AirseekersCloudCoordinator
+from . import commands
 from .coordinator import AirseekersTronConfigEntry, AirseekersTronData
 from .entity import AirseekersCloudEntity
 
@@ -19,10 +19,11 @@ from .entity import AirseekersCloudEntity
 class AirseekersButtonDescription(ButtonEntityDescription):
     """Describe an Airseekers cloud button."""
 
-    press_fn: Callable[[AirseekersCloudCoordinator], Awaitable[None]]
+    press_fn: Callable[[AirseekersTronData], Awaitable[None]]
 
 
-async def _command(cloud: AirseekersCloudCoordinator, name: str) -> None:
+async def _cloud_command(data: AirseekersTronData, name: str) -> None:
+    cloud = data.cloud
     await cloud.async_command(getattr(cloud.api, name)(cloud.sn))
 
 
@@ -31,13 +32,13 @@ BUTTONS: tuple[AirseekersButtonDescription, ...] = (
         key="stop",
         translation_key="stop",
         icon="mdi:stop",
-        press_fn=lambda c: _command(c, "stop_task"),
+        press_fn=commands.async_stop,
     ),
     AirseekersButtonDescription(
         key="resume",
         translation_key="resume",
         icon="mdi:play-pause",
-        press_fn=lambda c: c.async_resume(),
+        press_fn=commands.async_resume,
     ),
     AirseekersButtonDescription(
         key="rtk_reboot",
@@ -45,7 +46,7 @@ BUTTONS: tuple[AirseekersButtonDescription, ...] = (
         icon="mdi:restart",
         entity_category=EntityCategory.CONFIG,
         entity_registry_enabled_default=False,
-        press_fn=lambda c: _command(c, "rtk_reboot"),
+        press_fn=lambda d: _cloud_command(d, "rtk_reboot"),
     ),
     AirseekersButtonDescription(
         key="clean_warn",
@@ -53,7 +54,7 @@ BUTTONS: tuple[AirseekersButtonDescription, ...] = (
         icon="mdi:bell-off",
         entity_category=EntityCategory.CONFIG,
         entity_registry_enabled_default=False,
-        press_fn=lambda c: _command(c, "clean_warnings"),
+        press_fn=lambda d: _cloud_command(d, "clean_warnings"),
     ),
 )
 
@@ -76,6 +77,7 @@ class AirseekersButton(AirseekersCloudEntity, ButtonEntity):
     ) -> None:
         super().__init__(data, description.key)
         self.entity_description = description
+        self._data = data
 
     async def async_press(self) -> None:
-        await self.entity_description.press_fn(self.coordinator)
+        await self.entity_description.press_fn(self._data)

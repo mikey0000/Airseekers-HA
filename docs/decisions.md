@@ -111,3 +111,22 @@ keeps its last published position until the fix moves more than
 `PARKED_DEADBAND_M` (1 m); while moving or cutting it publishes every
 refresh. Shutdown is quiet as well: a connection closed while Home Assistant
 stops is not treated as a drop, so no reconnect is scheduled.
+
+## D15. Commands go local first; the cloud is the fallback
+
+Supersedes D1 for commands. With pyairseekers 0.3.0 (its D15 and D17) the
+mower card and buttons use the mower's local HTTP API on port 13344: start
+(the active map from `/map/list`), pause, resume, dock. The cloud is used only
+when the mower is unreachable (`AirseekersTransportError`); if the mower
+answers with a rejection, that is surfaced and **not** repeated through the
+cloud, which could double a command. Stop escalates instead, since stopping
+twice is harmless: HTTP task stop, then the verified `/controller/ctrl stop`
+over the bridge, then the cloud. The HTTP task commands are unverified on
+hardware and used on the owner's decision (pyairseekers D17, Q17).
+
+Readings also move local: volume, light brightness and night mode come from
+the mower's `/robot_config` topic (cloud copy as fallback), and
+`start_mowing_advanced` resolves zones from the mower's `/map/list`. Still on
+the cloud: settings writes, cut height and `start_mowing_advanced` itself
+(they live in the cloud task definition), RTK reboot, clear warnings, and the
+cameras (vendor WHEP server).

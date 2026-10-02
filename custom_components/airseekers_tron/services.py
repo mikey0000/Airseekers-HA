@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from pyairseekers import AirseekersError
 from pyairseekers.const import (
     CUT_SPEED_LOOKUP,
     MAP_FEATURE_KIND_MOWABLE_POLYGON,
@@ -21,6 +22,7 @@ from pyairseekers.const import (
 
 from .cloud_coordinator import AirseekersCloudCoordinator
 from .const import DOMAIN
+from .coordinator import AirseekersTronData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,16 +61,18 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
     async def start_mowing_advanced(call: ServiceCall) -> None:
         target = call.data.get("sn")
-        clouds = [
-            entry.runtime_data.cloud
+        mowers = [
+            entry.runtime_data
             for entry in hass.config_entries.async_entries(DOMAIN)
             if entry.state is ConfigEntryState.LOADED
             and (not target or entry.runtime_data.sn == target)
         ]
-        if not clouds:
+        if not mowers:
             raise ServiceValidationError(f"No loaded Airseekers mower {target or ''}")
-        for cloud in clouds:
-            await _start_mowing_advanced(cloud, call.data)
+        for mower in mowers:
+            await _start_mowing_advanced(
+                mower.cloud, call.data, await _local_maps(mower)
+            )
 
     hass.services.async_register(
         DOMAIN,
@@ -78,8 +82,19 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
 
 
+async def _local_maps(mower: AirseekersTronData) -> list[dict[str, Any]] | None:
+    """The mower's own maps, or None to use the cloud's copy."""
+    try:
+        return await mower.http.map_list()
+    except AirseekersError as err:
+        _LOGGER.debug("Local map list unavailable (%s); using the cloud's", err)
+        return None
+
+
 async def _start_mowing_advanced(
-    cloud: AirseekersCloudCoordinator, options: dict[str, Any]
+    cloud: AirseekersCloudCoordinator,
+    options: dict[str, Any],
+    maps: list[dict[str, Any]] | None = None,
 ) -> None:
     """Build a custom task from the first scheduled task and start it.
 
@@ -93,11 +108,14 @@ async def _start_mowing_advanced(
             "No scheduled task with zones in the Airseekers app; create a "
             "placeholder schedule first"
         )
-    if not data.maps:
+    maps = maps or data.maps
+    if not maps:
         raise HomeAssistantError("No maps loaded for this mower")
     base_task = data.tasks[0]
     base_units: list[dict[str, Any]] = base_task["task_units"]
-    current_map = data.maps[0]
+    current_map = next(
+        (m for m in maps if str(m.get("mapId")) == (data.current_map_id or "")), maps[0]
+    )
 
     zone_ids = {
         str(props["name"]): str(props["id"])

@@ -3,7 +3,7 @@
 A Home Assistant integration for the Airseekers Tron robotic mower.
 
 - **Reads** come from the mower's local Foxglove bridge (`ws://<mower-ip>:8765`): pushed in real time, no polling, works without the internet.
-- **Writes** go through your Airseekers cloud account, the same path the official app uses.
+- **Commands** (start, pause, resume, stop, dock) go to the mower's local HTTP API first and through your Airseekers cloud account only if the mower can't be reached. Settings changes, cut height and zone-based starts still use the cloud.
 - **Live video** from the front, left and right cameras plays through Home Assistant's native WebRTC.
 
 Built on [pyairseekers](https://github.com/mikey0000/PyAirseekers), where the protocol details and their evidence levels are documented.
@@ -12,13 +12,13 @@ Built on [pyairseekers](https://github.com/mikey0000/PyAirseekers), where the pr
 
 | Platform | Source | Entities |
 |---|---|---|
-| Lawn mower | local state, cloud commands | start, pause, dock |
+| Lawn mower | local state, local commands (cloud fallback) | start, pause, dock |
 | Sensor | local | battery, voltage, current, temperature, satellites, GPS quality and SNR, RTK fix, LoRa / Wi-Fi RSSI, mower state, task state / type / runtime, area mowed / remaining, progress |
 | Binary sensor | local | charging, cutting, moving, rain, lifted, bumper, emergency stop, alarm, NRTK, routing, battery gate |
 | Device tracker | local | GPS position |
-| Button | cloud | stop, resume, reboot RTK, clear warnings |
-| Number | cloud | volume, light brightness, cut height |
-| Switch | cloud | night mode |
+| Button | local (cloud fallback) / cloud | stop, resume / reboot RTK, clear warnings |
+| Number | local reading, cloud write | volume, light brightness, cut height |
+| Switch | local reading, cloud write | night mode |
 | Camera | cloud (WebRTC) | front, left, right |
 
 Service `airseekers_tron.start_mowing_advanced` starts a task with chosen zones and cut settings (height, direction, speed, efficiency, turning).

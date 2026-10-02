@@ -30,6 +30,7 @@ class AirseekersNightModeSwitch(AirseekersCloudEntity, SwitchEntity, RestoreEnti
     _attr_translation_key = "night_mode"
     _attr_icon = "mdi:weather-night"
     _attr_entity_category = EntityCategory.CONFIG
+    _reads_local = True
 
     def __init__(self, data: AirseekersTronData) -> None:
         super().__init__(data, "night_mode")
@@ -38,22 +39,30 @@ class AirseekersNightModeSwitch(AirseekersCloudEntity, SwitchEntity, RestoreEnti
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         # Remember the schedule across turn-off/turn-on and restarts
-        if self.coordinator.data.night_mode_raw:
+        if self._night_mode_raw:
             return
         if (state := await self.async_get_last_state()) is not None:
             self._last_schedule = (
                 state.attributes.get("schedule") or self._last_schedule
             )
 
+    @property
+    def _night_mode_raw(self) -> str:
+        """SetDarkMode from the mower's /robot_config, else the cloud copy."""
+        local = self._local.data.robot_config.get("SetDarkMode")
+        return (
+            local.strip() if local is not None else self.coordinator.data.night_mode_raw
+        )
+
     @callback
     def _handle_coordinator_update(self) -> None:
-        if schedule := self.coordinator.data.night_mode_raw:
+        if schedule := self._night_mode_raw:
             self._last_schedule = schedule
         super()._handle_coordinator_update()
 
     @property
     def is_on(self) -> bool:
-        return bool(self.coordinator.data.night_mode_raw)
+        return bool(self._night_mode_raw)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

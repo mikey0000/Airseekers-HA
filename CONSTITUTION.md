@@ -5,17 +5,20 @@ A change that breaks one needs a new numbered entry in `docs/decisions.md`
 that supersedes it. Transport-level rules live in pyairseekers'
 `CONSTITUTION.md` and apply here too.
 
-## 1. Local reads, cloud writes
+## 1. Local first, cloud as fallback
 
-Every read entity is backed by the local push coordinator (`coordinator.py`);
-every write entity and the cameras by the cloud coordinator
-(`cloud_coordinator.py`). Telemetry is never polled from the cloud. The cloud
-is polled only for what commands need, at a slow interval (D3).
+Telemetry comes only from the local push coordinator (`coordinator.py`) and
+is never polled from the cloud. Commands go to the mower locally first and to
+the cloud only when the mower is unreachable (`commands.py`, D15). The cloud
+coordinator (`cloud_coordinator.py`) is polled slowly, only for what
+cloud-only features need (D3).
 
-## 2. The local bridge is read-only
+## 2. Local commands only through pyairseekers' sanctioned paths
 
-Nothing in this integration publishes to the Foxglove bridge or calls a ROS
-service. Local commands wait on the verification in pyairseekers D3.
+Local commands go through `pyairseekers.LocalApi` task commands (pyairseekers
+D17) and `MowerController.stop` (pyairseekers D15), and only from
+`commands.py`. Nothing here publishes to the Foxglove bridge, calls
+`call_service`, or writes maps.
 
 ## 3. No transport code here
 
@@ -25,7 +28,8 @@ endpoint is added to the library first.
 
 ## 4. Commands never fail silently
 
-Every cloud command goes through `AirseekersCloudCoordinator.async_command`,
+Every command goes through `commands.py` or, for cloud-only features,
+`AirseekersCloudCoordinator.async_command`,
 which turns a library error into `HomeAssistantError` (and a rejected login
 into a reauth flow), then refreshes. No entity swallows a failed command or
 logs-and-continues.

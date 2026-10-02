@@ -10,7 +10,7 @@ live in [pyairseekers](https://github.com/mikey0000/PyAirseekers) (`CONSTITUTION
 Home Assistant (HACS) custom integration for the **Airseekers Tron** robotic mower. Hybrid:
 
 - **Reads** come from the mower's local Foxglove Bridge (`ws://<mower-ip>:8765`, Foxglove WebSocket protocol v1, no auth).
-- **Writes** (start/pause/dock, settings, `start_mowing_advanced`) and **live video** go through the Airseekers cloud API, the same path the official app uses.
+- **Commands** go local first (mower HTTP API on 13344, verified controller stop) with the cloud as fallback (`commands.py`, D15); settings writes, cut height, `start_mowing_advanced` and **live video** go through the Airseekers cloud API.
 
 - **HA domain:** `airseekers_tron`
 - **IoT class:** `local_push` (the bridge streams data; the cloud is polled slowly only for write context)

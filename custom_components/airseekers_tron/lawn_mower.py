@@ -10,6 +10,7 @@ from homeassistant.components.lawn_mower import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from . import commands
 from .coordinator import AirseekersTronConfigEntry, AirseekersTronData
 from .entity import AirseekersTronEntity
 
@@ -34,17 +35,17 @@ class AirseekersTronMower(AirseekersTronEntity, LawnMowerEntity):
 
     def __init__(self, data: AirseekersTronData) -> None:
         super().__init__(data)
-        self._cloud = data.cloud
+        self._data = data
         self._attr_unique_id = f"{data.sn}_mower"
 
     async def async_start_mowing(self) -> None:
-        await self._cloud.async_start_mowing()
+        await commands.async_start(self._data)
 
     async def async_pause(self) -> None:
-        await self._cloud.async_command(self._cloud.api.pause_task(self._cloud.sn))
+        await commands.async_pause(self._data)
 
     async def async_dock(self) -> None:
-        await self._cloud.async_command(self._cloud.api.dock(self._cloud.sn))
+        await commands.async_dock(self._data)
 
     @property
     def activity(self) -> LawnMowerActivity | None:
